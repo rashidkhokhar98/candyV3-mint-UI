@@ -1,22 +1,101 @@
 import styles from "../styles/Home.module.css";
 import { useMetaplex } from "./useMetaplex";
-import { useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useEffect, useState } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
+
+import {
+  CandyMachine,
+  Metaplex,
+  Nft,
+  NftWithToken,
+  // PublicKey,
+  Sft,
+  SftWithToken,
+  walletAdapterIdentity,
+} from "@metaplex-foundation/js"
+
 import { PublicKey } from "@solana/web3.js";
+// import { fromTxError } from "@/utils/errors"
+
+import { errorFromCode } from "@metaplex-foundation/mpl-candy-guard"
+
+function fromTxError(err) {
+  const match = /custom program error: (\w+)/.exec(err + "")
+
+  if (match === null) {
+    return null
+  }
+
+  const [codeRaw] = match.slice(1)
+
+  let errorCode
+  try {
+    errorCode = parseInt(codeRaw, 16)
+  } catch (parseErr) {
+    return null
+  }
+
+  return errorFromCode(errorCode)
+}
+
 
 export const MintNFTs = ({ onClusterChange }) => {
-  const { metaplex } = useMetaplex();
+  // const { metaplex } = useMetaplex();
   const wallet = useWallet();
+  const { connection } = useConnection()
 
   const [nft, setNft] = useState(null);
 
-  const [disableMint, setDisableMint] = useState(true);
+  const [disableMint, setDisableMint] = useState(false);
+
+
+  const [metaplex, setMetaplex] = useState(null)
+  const [candyMachine, setCandyMachine] = useState(null)
+
+
+  const [collection, setCollection] = useState(null)
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [formMessage, setFormMessage] = useState(null)
+
+
 
   const candyMachineAddress = new PublicKey(
     process.env.NEXT_PUBLIC_CANDY_MACHINE_ID
   );
-  let candyMachine;
+  // let candyMachine;
   let walletBalance;
+
+
+
+  useEffect(() => {
+    ;(async () => {
+      if (wallet && connection && !collection && !candyMachine) {
+        if (!process.env.NEXT_PUBLIC_CANDY_MACHINE_ID) {
+          throw new Error("Please provide a candy machine id")
+        }
+        const metaplex = new Metaplex(connection).use(
+          walletAdapterIdentity(wallet)
+        )
+        setMetaplex(metaplex)
+
+        const candyMachine = await metaplex.candyMachines().findByAddress({
+          address: new PublicKey(process.env.NEXT_PUBLIC_CANDY_MACHINE_ID),
+        })
+
+        setCandyMachine(candyMachine)
+
+        const collection = await metaplex
+          .nfts()
+          .findByMint({ mintAddress: candyMachine.collectionMintAddress })
+
+        setCollection(collection)
+
+        console.log(collection)
+      }
+    })()
+  }, [wallet, collection, candyMachine])
 
   const addListener = async () => {
     // add a listener to monitor changes to the candy guard
@@ -260,6 +339,9 @@ export const MintNFTs = ({ onClusterChange }) => {
   }
 
   const onClick = async () => {
+    try {
+    setIsLoading(true)
+
     // Here the actual mint happens. Depending on the guards that you are using you have to run some pre validation beforehand 
     // Read more: https://docs.metaplex.com/programs/candy-machine/minting#minting-with-pre-validation
     const { nft } = await metaplex.candyMachines().mint({
@@ -267,17 +349,48 @@ export const MintNFTs = ({ onClusterChange }) => {
       collectionUpdateAuthority: candyMachine.authorityAddress,
     });
 
+    setIsLoading(false)
+    setFormMessage("Minted successfully!")
     setNft(nft);
+
+  } catch (e) {
+    const msg = fromTxError(e)
+
+    if (msg) {
+      setFormMessage(msg.message)
+    } else {
+      const msg = e.message || e.toString()
+      setFormMessage(msg)
+    }
+  } finally {
+    setIsLoading(false)
+
+    setTimeout(() => {
+      setFormMessage(null)
+    }, 5000)
+  }
   };
+
+
+
+  const cost = candyMachine
+  ? candyMachine.candyGuard?.guards.solPayment
+    ? Number(candyMachine.candyGuard?.guards.solPayment?.amount.basisPoints) /
+        1e9 +
+      " SOL"
+    : "Free mint"
+  : "..."
+
 
   return (
     <div>
-      <select onChange={onClusterChange} className={styles.dropdown}>
+      {/* <select onChange={onClusterChange} className={styles.dropdown}>
+      <option value="mainnet">Mainnet</option>
         <option value="devnet">Devnet</option>
-        <option value="mainnet">Mainnet</option>
         <option value="testnet">Testnet</option>
-      </select>
-      <div>
+      </select> */}
+
+      {/* <div>
         <div className={styles.container}>
           <h1 className={styles.title}>NFT Mint Address</h1>
           <div className={styles.nftForm}>
@@ -300,7 +413,135 @@ export const MintNFTs = ({ onClusterChange }) => {
             </div>
           )}
         </div>
+      </div> */}
+
+<main
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "96px 0",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: "32px",
+            alignItems: "flex-start",
+          }}
+        >
+          <img
+            style={{ maxWidth: "396px", borderRadius: "8px" }}
+            src={collection?.json?.image}
+          />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              background: "#111",
+              padding: "32px 24px",
+              borderRadius: "16px",
+              border: "1px solid #222",
+              width: "320px",
+            }}
+          >
+            <h1>{collection?.name}</h1>
+            <p style={{ color: "#807a82", marginBottom: "32px" }}>
+              {collection?.json?.description}
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                background: "#261727",
+                padding: "16px 12px",
+                borderRadius: "16px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span>Public</span>
+                <b>{cost}</b>
+                {/* <b>1 PALM</b>  */}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                }}
+              >
+                <span style={{ fontSize: "11px" }}>Live</span>
+                {/* <span style={{ fontSize: "11px" }}>512/1024</span> */}
+              </div>
+              {/* <button disabled={!publicKey || isLoading} onClick={handleMintV2}>
+                {isLoading ? "Minting your NFT..." : "Mint"}
+              </button> */}
+
+              <button disabled={disableMint} onClick={onClick}>
+                {isLoading ? "Minting your NFT..." : "Mint"}
+              </button>
+              
+              <WalletMultiButton
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  marginTop: "8px",
+                  padding: "8px 0",
+                  justifyContent: "center",
+                  fontSize: "13px",
+                  backgroundColor: "#111",
+                  lineHeight: "1.45",
+                }}
+              />
+              <p
+                style={{
+                  textAlign: "center",
+                  marginTop: "4px",
+                }}
+              >
+                {formMessage}
+              </p>
+            </div>
+          </div>
+        </div>
+
+      {nft === null ? (<></>):
+      (
+        <div>
+        <div className={styles.container}>
+          <h1 className={styles.title}>NFT Mint Address</h1>
+          <div className={styles.nftForm}>
+            <input
+              type="text"
+              value={nft ? nft.mint.address.toBase58() : ""}
+              readOnly
+            />
+            {/* <button onClick={onClick} disabled={disableMint}>
+              mint NFT
+            </button> */}
+          </div>
+          {nft && (
+            <div className={styles.nftPreview}>
+              <h1>{nft.name}</h1>
+              <img
+                src={nft?.json?.image || "/fallbackImage.jpg"}
+                alt="The downloaded illustration of the provided NFT address."
+              />
+            </div>
+          )}
+        </div>
       </div>
+      )}
+         
+
+
+      </main>
     </div>
   );
 };

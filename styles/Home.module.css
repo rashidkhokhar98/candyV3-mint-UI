@@ -16,9 +16,10 @@
 
 .title {
   text-align: left;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
-  color: #0f172a;
+  /* color: #0f172a; */
+  color: #f1f3f8;
 }
 
 .nftForm {

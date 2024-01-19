@@ -1,3 +1,4 @@
+import Head from "next/head"
 import styles from "../styles/Home.module.css";
 import { useMemo, useState, useEffect } from "react";
 import {
@@ -17,43 +18,67 @@ import {
   WalletMultiButton,
 } from "@solana/wallet-adapter-react-ui";
 import { clusterApiUrl } from "@solana/web3.js";
-import { MetaplexProvider } from "./MetaplexProvider";
-import { MintNFTs } from "./MintNFTs";
+import { MetaplexProvider } from "../components/MetaplexProvider.js";
+import { MintNFTs } from "../components/MintNFTs.js";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import dynamic from 'next/dynamic';
 
 export default function Home() {
-  const [network, setNetwork] = useState(WalletAdapterNetwork.Devnet);
+  // const [network, setNetwork] = useState(WalletAdapterNetwork.Mainnet);
 
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  // console.log("network", network)
+
+  // const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+
+  // const wallets = useMemo(
+  //   () => [
+  //     new PhantomWalletAdapter(),
+  //     // new GlowWalletAdapter(),
+  //     // new SlopeWalletAdapter(),
+  //     new SolflareWalletAdapter({ network }),
+  //     new TorusWalletAdapter(),
+  //   ],
+  //   [network]
+  // );
+
+  // const handleChange = (event) => {
+  //   switch (event.target.value) {
+  //     case "devnet":
+  //       setNetwork(WalletAdapterNetwork.Devnet);
+  //       break;
+  //     case "mainnet":
+  //       setNetwork(WalletAdapterNetwork.Mainnet);
+  //       break;
+  //     case "testnet":
+  //       setNetwork(WalletAdapterNetwork.Testnet);
+  //       break;
+  //     default:
+  //       setNetwork(WalletAdapterNetwork.Mainnet);
+  //       break;
+  //   }
+  // };
+
+
+  const handleChange = (event) => {
+    console.log("we are using mainnet")
+  };
+
+
+
+  if (!process.env.NEXT_PUBLIC_RPC_ENDPOINT) throw new Error("Missing RPC URL")
+
+  const endpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT
 
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
-      // new GlowWalletAdapter(),
-      // new SlopeWalletAdapter(),
-      new SolflareWalletAdapter({ network }),
+      // new BackpackWalletAdapter(),
+      new SolflareWalletAdapter(),
       new TorusWalletAdapter(),
+      // new LedgerWalletAdapter(),
     ],
-    [network]
-  );
-
-  const handleChange = (event) => {
-    switch (event.target.value) {
-      case "devnet":
-        setNetwork(WalletAdapterNetwork.Devnet);
-        break;
-      case "mainnet":
-        setNetwork(WalletAdapterNetwork.Mainnet);
-        break;
-      case "testnet":
-        setNetwork(WalletAdapterNetwork.Testnet);
-        break;
-      default:
-        setNetwork(WalletAdapterNetwork.Devnet);
-        break;
-    }
-  };
+    []
+  )
 
   const ButtonWrapper = dynamic(() =>
     import('@solana/wallet-adapter-react-ui').then((mod) => mod.WalletMultiButton)
@@ -61,8 +86,16 @@ export default function Home() {
 
 
   return (
+    <>
+     <Head>
+        <title>4 B share Collection Mint</title>
+        <meta name="description" content="Get your unique NFT now!" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
     <div>
-      <ConnectionProvider endpoint={endpoint}>
+     
+      <ConnectionProvider endpoint={endpoint}  config={{ commitment: "confirmed" }}>
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
             <MetaplexProvider>
@@ -75,5 +108,7 @@ export default function Home() {
         </WalletProvider>
       </ConnectionProvider>
     </div>
+    </>
+
   );
 }
